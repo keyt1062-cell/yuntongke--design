@@ -231,6 +231,142 @@ function AtmosphereCanvas({ palette }) {
   return <canvas className="ambient-canvas" ref={canvasRef} aria-hidden="true" />;
 }
 
+function ParticleField() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!context) return undefined;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.45, active: false };
+    let particles = [];
+    let frame = 0;
+    let running = true;
+    let previousScroll = window.scrollY;
+    let scrollEnergy = 0;
+
+    const createParticle = (randomDepth = true) => ({
+      x: (Math.random() - 0.5) * 1.9,
+      y: (Math.random() - 0.5) * 1.35,
+      z: randomDepth ? Math.random() * 0.92 + 0.08 : 1,
+      size: Math.random() * 1.5 + 0.55,
+      drift: (Math.random() - 0.5) * 0.0007,
+      hue: Math.random() > 0.72 ? "255,107,91" : "113,222,246",
+    });
+    const resize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = Math.max(1, Math.round(width));
+      canvas.height = Math.max(1, Math.round(height));
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      const desired = width < 720 ? 38 : Math.min(96, Math.round(width / 17));
+      if (particles.length !== desired) particles = Array.from({ length: desired }, () => createParticle());
+    };
+    const onPointerMove = (event) => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; };
+    const onPointerLeave = () => { pointer.active = false; };
+    const draw = () => {
+      if (!running) return;
+      const width = canvas.width;
+      const height = canvas.height;
+      const currentScroll = window.scrollY;
+      const targetEnergy = Math.min(1, Math.abs(currentScroll - previousScroll) / 42);
+      previousScroll = currentScroll;
+      scrollEnergy += (targetEnergy - scrollEnergy) * 0.1;
+      const baseOpacity = width < 720 ? 0.62 : 0.84;
+      canvas.style.opacity = `${Math.max(0.16, baseOpacity - Math.min(1, currentScroll / Math.max(window.innerHeight, 1)) * 0.66)}`;
+      context.clearRect(0, 0, width, height);
+      context.globalCompositeOperation = "lighter";
+
+      particles.forEach((particle) => {
+        const previousZ = particle.z;
+        particle.z -= 0.0016 + scrollEnergy * 0.012;
+        particle.x += particle.drift;
+        if (particle.z < 0.035 || Math.abs(particle.x) > 1.25) Object.assign(particle, createParticle(false));
+        const perspective = 1 / (particle.z * 1.7 + 0.18);
+        let screenX = width * 0.5 + particle.x * width * 0.38 * perspective;
+        let screenY = height * 0.5 + particle.y * height * 0.48 * perspective;
+        const dx = screenX - pointer.x;
+        const dy = screenY - pointer.y;
+        const distance = Math.hypot(dx, dy);
+        if (pointer.active && distance < 180) {
+          const push = (1 - distance / 180) * 20;
+          screenX += (dx / Math.max(distance, 1)) * push;
+          screenY += (dy / Math.max(distance, 1)) * push;
+        }
+        const alpha = Math.min(0.82, (1 - particle.z) * 0.72 + 0.08);
+        const radius = particle.size * perspective * (1 + scrollEnergy * 1.8);
+        const trail = Math.max(2, (previousZ - particle.z) * height * perspective * (10 + scrollEnergy * 32));
+        const gradient = context.createLinearGradient(screenX, screenY - trail, screenX, screenY + radius);
+        gradient.addColorStop(0, `rgba(${particle.hue},0)`);
+        gradient.addColorStop(1, `rgba(${particle.hue},${alpha})`);
+        context.strokeStyle = gradient;
+        context.lineWidth = Math.max(0.45, radius * 0.48);
+        context.beginPath(); context.moveTo(screenX, screenY - trail); context.lineTo(screenX, screenY); context.stroke();
+        context.fillStyle = `rgba(${particle.hue},${alpha})`;
+        context.beginPath(); context.arc(screenX, screenY, Math.max(0.7, radius), 0, Math.PI * 2); context.fill();
+
+        if (pointer.active && distance < 145) {
+          context.strokeStyle = `rgba(${particle.hue},${(1 - distance / 145) * 0.16})`;
+          context.lineWidth = 0.55;
+          context.beginPath(); context.moveTo(screenX, screenY); context.lineTo(pointer.x, pointer.y); context.stroke();
+        }
+      });
+      context.globalCompositeOperation = "source-over";
+      if (!reducedMotion) frame = requestAnimationFrame(draw);
+    };
+    const onVisibility = () => {
+      running = !document.hidden;
+      if (running && !reducedMotion) frame = requestAnimationFrame(draw);
+      else if (frame) cancelAnimationFrame(frame);
+    };
+    resize();
+    window.addEventListener("resize", resize, { passive: true });
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onPointerLeave);
+    document.addEventListener("visibilitychange", onVisibility);
+    draw();
+    return () => {
+      running = false;
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", onPointerMove);
+      document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  return <canvas className="particle-canvas" ref={canvasRef} aria-hidden="true" />;
+}
+
+function CursorLens() {
+  const lensRef = useRef(null);
+  useEffect(() => {
+    const lens = lensRef.current;
+    if (!lens) return undefined;
+    const move = (event) => {
+      lens.style.setProperty("--lens-x", `${event.clientX}px`);
+      lens.style.setProperty("--lens-y", `${event.clientY}px`);
+      lens.classList.add("is-visible");
+    };
+    const leave = () => lens.classList.remove("is-visible");
+    const down = () => lens.classList.add("is-pressed");
+    const up = () => lens.classList.remove("is-pressed");
+    window.addEventListener("pointermove", move, { passive: true });
+    document.documentElement.addEventListener("pointerleave", leave);
+    window.addEventListener("pointerdown", down, { passive: true });
+    window.addEventListener("pointerup", up, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      document.documentElement.removeEventListener("pointerleave", leave);
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
+  return <span className="cursor-lens" ref={lensRef} aria-hidden="true"><i /></span>;
+}
+
 function ProjectPlate({ project, position, dragX, onSelect }) {
   const isActive = position === 0;
   return (
@@ -396,6 +532,8 @@ function App() {
   return (
     <div className="site-shell">
       <AtmosphereCanvas palette={atmospherePalettes[activeId]} />
+      <ParticleField />
+      <CursorLens />
       <div className="page-progress" aria-hidden="true"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
       <header className="site-header">
         <a className="identity" href="#home" aria-label="Yuntong Ke home">
@@ -411,6 +549,7 @@ function App() {
 
       <main>
         <section className="archive-hero" id="home">
+          <div className="kinetic-rail" aria-hidden="true"><span>IMAGINED SYSTEMS · CULTURAL FUTURES · MACHINE DREAMS ·&nbsp;</span><span>IMAGINED SYSTEMS · CULTURAL FUTURES · MACHINE DREAMS ·&nbsp;</span></div>
           <div className="film-strip" aria-hidden="true">
             <video autoPlay muted loop playsInline preload="auto" poster={asset("optimized/emotional-weather/anxiety-storm.jpg")}>
               <source src={asset("assets/video/hero-background.mp4")} type="video/mp4" />
