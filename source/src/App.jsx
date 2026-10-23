@@ -60,6 +60,177 @@ const heritageWorks = [
   ["White Pagoda", "optimized/heritage/white-pagoda.jpg"],
 ];
 
+const atmospherePalettes = {
+  weather: [[0.08, 0.28, 0.42], [0.38, 0.18, 0.28]],
+  archive: [[0.12, 0.36, 0.40], [0.22, 0.12, 0.36]],
+  heritage: [[0.10, 0.30, 0.34], [0.48, 0.20, 0.12]],
+};
+
+function AtmosphereCanvas({ palette }) {
+  const canvasRef = useRef(null);
+  const paletteRef = useRef(palette);
+
+  useEffect(() => { paletteRef.current = palette; }, [palette]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const gl = canvas?.getContext("webgl", { alpha: true, antialias: false, powerPreference: "low-power" });
+    if (!gl) return undefined;
+
+    const vertexSource = `
+      attribute vec2 aPosition;
+      void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
+    `;
+    const fragmentSource = `
+      precision highp float;
+      uniform vec2 uResolution;
+      uniform vec2 uPointer;
+      uniform float uTime;
+      uniform float uScroll;
+      uniform float uVelocity;
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+
+      float grain(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      void main() {
+        vec2 safeResolution = max(uResolution, vec2(1.0));
+        vec2 uv = gl_FragCoord.xy / safeResolution;
+        vec2 p = (gl_FragCoord.xy * 2.0 - safeResolution.xy) / min(safeResolution.x, safeResolution.y);
+        vec2 pointer = vec2(uPointer.x * 2.0 - 1.0, (1.0 - uPointer.y) * 2.0 - 1.0);
+        pointer.x *= safeResolution.x / safeResolution.y;
+
+        float drift = sin(p.x * 1.25 + uTime * 0.16 + sin(p.y * 1.8 - uTime * 0.11));
+        drift += cos(p.y * 1.55 - uTime * 0.13 + p.x * 0.7);
+        drift = drift * 0.25 + 0.5;
+
+        float halo = exp(-length(p - pointer) * 1.65);
+        float ripple = sin(length(p - pointer) * 15.0 - uTime * 1.8) * halo;
+        float scrollWave = sin((p.y + uScroll * 2.4) * 2.1 + uTime * 0.08) * 0.5 + 0.5;
+        float field = smoothstep(0.08, 0.96, drift * 0.62 + scrollWave * 0.38 + ripple * 0.07);
+
+        vec3 color = mix(vec3(0.014, 0.024, 0.038), uColorA, field * 0.58);
+        color = mix(color, uColorB, smoothstep(0.28, 1.1, length(p + vec2(0.48, -0.18))) * 0.35);
+        color += uColorA * halo * (0.10 + uVelocity * 0.08);
+
+        vec2 gridUv = abs(fract(uv * vec2(26.0, 16.0) + vec2(uScroll * 0.28, 0.0)) - 0.5);
+        float grid = 1.0 - smoothstep(0.47, 0.5, max(gridUv.x, gridUv.y));
+        color += vec3(0.12, 0.23, 0.28) * grid * 0.025;
+        color += (grain(gl_FragCoord.xy + uTime) - 0.5) * 0.025;
+
+        float vignette = smoothstep(1.35, 0.22, length(p * vec2(0.76, 0.92)));
+        color *= 0.68 + vignette * 0.42;
+        gl_FragColor = vec4(color, 0.96);
+      }
+    `;
+
+    const compile = (type, source) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    };
+    const vertex = compile(gl.VERTEX_SHADER, vertexSource);
+    const fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
+    if (!vertex || !fragment) return undefined;
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return undefined;
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, "aPosition");
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    const uniforms = {
+      resolution: gl.getUniformLocation(program, "uResolution"),
+      pointer: gl.getUniformLocation(program, "uPointer"),
+      time: gl.getUniformLocation(program, "uTime"),
+      scroll: gl.getUniformLocation(program, "uScroll"),
+      velocity: gl.getUniformLocation(program, "uVelocity"),
+      colorA: gl.getUniformLocation(program, "uColorA"),
+      colorB: gl.getUniformLocation(program, "uColorB"),
+    };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const pointerTarget = { x: 0.5, y: 0.45 };
+    const pointerCurrent = { ...pointerTarget };
+    let previousScroll = window.scrollY;
+    let velocity = 0;
+    let frame = 0;
+    let running = true;
+    let lastTime = performance.now();
+    let colorA = [...paletteRef.current[0]];
+    let colorB = [...paletteRef.current[1]];
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 720 ? 1 : 1.35);
+      const width = Math.max(1, Math.round(window.innerWidth * dpr));
+      const height = Math.max(1, Math.round(window.innerHeight * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width; canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
+    };
+    const onPointerMove = (event) => {
+      pointerTarget.x = event.clientX / Math.max(window.innerWidth, 1);
+      pointerTarget.y = event.clientY / Math.max(window.innerHeight, 1);
+    };
+    const render = (now) => {
+      if (!running) return;
+      resize();
+      const delta = Math.min(32, now - lastTime); lastTime = now;
+      const range = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const scroll = window.scrollY;
+      const targetVelocity = Math.min(1, Math.abs(scroll - previousScroll) / Math.max(delta, 1) * 0.22);
+      previousScroll = scroll;
+      velocity += (targetVelocity - velocity) * 0.08;
+      pointerCurrent.x += (pointerTarget.x - pointerCurrent.x) * 0.055;
+      pointerCurrent.y += (pointerTarget.y - pointerCurrent.y) * 0.055;
+      colorA = colorA.map((value, index) => value + (paletteRef.current[0][index] - value) * 0.025);
+      colorB = colorB.map((value, index) => value + (paletteRef.current[1][index] - value) * 0.025);
+      gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+      gl.uniform2f(uniforms.pointer, pointerCurrent.x, pointerCurrent.y);
+      gl.uniform1f(uniforms.time, now * 0.001);
+      gl.uniform1f(uniforms.scroll, scroll / range);
+      gl.uniform1f(uniforms.velocity, velocity);
+      gl.uniform3fv(uniforms.colorA, colorA);
+      gl.uniform3fv(uniforms.colorB, colorB);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (!reducedMotion) frame = requestAnimationFrame(render);
+    };
+    const onVisibility = () => {
+      running = !document.hidden;
+      if (running && !reducedMotion) { lastTime = performance.now(); frame = requestAnimationFrame(render); }
+      else if (frame) cancelAnimationFrame(frame);
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    render(performance.now());
+
+    return () => {
+      running = false;
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("visibilitychange", onVisibility);
+      gl.deleteBuffer(buffer); gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment);
+    };
+  }, []);
+
+  return <canvas className="ambient-canvas" ref={canvasRef} aria-hidden="true" />;
+}
+
 function ProjectPlate({ project, position, dragX, onSelect }) {
   const isActive = position === 0;
   return (
@@ -79,10 +250,15 @@ function ProjectPlate({ project, position, dragX, onSelect }) {
 
 function WorkGallery({ items, label }) {
   const [active, setActive] = useState(0);
+  const moveLight = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--gallery-x", `${event.clientX - bounds.left}px`);
+    event.currentTarget.style.setProperty("--gallery-y", `${event.clientY - bounds.top}px`);
+  };
   return (
     <div className="work-gallery">
-      <figure className="work-gallery-main">
-        <img src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
+      <figure className="work-gallery-main" onPointerMove={moveLight}>
+        <img key={items[active][1]} src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
         <figcaption><span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span><strong>{items[active][0]}</strong></figcaption>
       </figure>
       <div className="work-gallery-list" role="list" aria-label={label} style={{ "--item-count": Math.min(items.length, 9) }}>
@@ -189,8 +365,12 @@ function App() {
   const handlePointerMove = (event) => {
     const bounds = stageRef.current?.getBoundingClientRect();
     if (bounds) {
-      stageRef.current.style.setProperty("--pointer-x", `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
-      stageRef.current.style.setProperty("--pointer-y", `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
+      const x = (event.clientX - bounds.left) / bounds.width;
+      const y = (event.clientY - bounds.top) / bounds.height;
+      stageRef.current.style.setProperty("--pointer-x", `${x * 100}%`);
+      stageRef.current.style.setProperty("--pointer-y", `${y * 100}%`);
+      stageRef.current.style.setProperty("--tilt-x", `${(x - 0.5) * 5}deg`);
+      stageRef.current.style.setProperty("--tilt-y", `${(0.5 - y) * 4}deg`);
     }
     if (isDragging) setDragX(Math.max(-170, Math.min(170, event.clientX - startXRef.current)));
   };
@@ -207,9 +387,15 @@ function App() {
     setIsDragging(false); setDragX(0);
     if (stageRef.current?.hasPointerCapture(event.pointerId)) stageRef.current.releasePointerCapture(event.pointerId);
   };
+  const resetStageTilt = () => {
+    if (isDragging || !stageRef.current) return;
+    stageRef.current.style.setProperty("--tilt-x", "0deg");
+    stageRef.current.style.setProperty("--tilt-y", "0deg");
+  };
 
   return (
     <div className="site-shell">
+      <AtmosphereCanvas palette={atmospherePalettes[activeId]} />
       <div className="page-progress" aria-hidden="true"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
       <header className="site-header">
         <a className="identity" href="#home" aria-label="Yuntong Ke home">
@@ -236,7 +422,7 @@ function App() {
             <h1>An evolving archive<br />of <em>imagined</em> systems.</h1>
             <span>Visual narratives for culture, emotion and emerging technology.</span>
           </div>
-          <div className={`archive-stage ${isDragging ? "is-dragging" : ""}`} ref={stageRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+          <div className={`archive-stage ${isDragging ? "is-dragging" : ""}`} ref={stageRef} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} onPointerLeave={resetStageTilt}>
             <div className="archive-stage-perspective">
               {archiveProjects.map((project, index) => <ProjectPlate key={project.id} project={project} position={positions[index]} dragX={dragX} onSelect={setActiveId} />)}
             </div>
