@@ -1,62 +1,67 @@
-# Design QA — Kinetic Archive
+# Design QA — Living Glass / Perception Field
 
 ## Evidence
 
-- Source visual truth: `/Users/ke/.codex/generated_images/01a074b0-103b-7113-9f1c-ba46f4d4784d/exec-4f32e801-a855-4c17-bb90-ed86c5c8acd6.png`
-- Source pixels: 1536 × 1058; generated as a 1440 × 1024 desktop target and visually normalized to the implementation viewport.
-- Implementation: `http://127.0.0.1:4173/#home`
-- Implementation screenshot: Codex in-app browser capture from browser tab 2 at the 1440 × 1024 viewport (the browser capture API did not expose a filesystem path).
-- CSS viewport: 1440 × 1024.
-- Device scale/density: browser default; visual comparison used equal CSS viewport proportions without browser chrome.
-- State: first screen, Emotional Weather Bureau selected, desktop dark theme.
+- Source visual truth: `/Users/ke/.codex/generated_images/01a074b0-103b-7113-9f1c-ba46f4d4784d/exec-d771ef52-5991-415d-85c2-595e9cccf209.png`
+- Source pixels: 1672 × 941.
+- Implementation URL: `http://127.0.0.1:4173/`
+- Implementation screenshot: `/Users/ke/Documents/Codex/2026-09-06/zhi-q/work/yuntongke-design/design-qa-implementation.png`
+- Full-view comparison: `/Users/ke/Documents/Codex/2026-09-06/zhi-q/work/yuntongke-design/design-qa-comparison.jpg`
+- Focused comparison: `/Users/ke/Documents/Codex/2026-09-06/zhi-q/work/yuntongke-design/design-qa-focus.jpg`
+- Implementation pixels: 1672 × 942; CSS viewport 1672 × 942; device scale factor 1. No density normalization was required.
+- State: desktop dark theme, top of page, Emotional Weather Bureau selected.
 - Additional responsive evidence: 390 × 844 mobile viewport.
-- Primary interactions tested: previous/next archive controls, direct project selection, case-study anchor navigation, gallery thumbnail selection, keyboard arrow switching, and responsive navigation.
-- Browser console: checked after desktop and mobile interaction tests; no warnings or errors.
+- Primary interactions tested: next-project switching, direct project selection, active metadata updates, Ask YK panel open/close, keyboard-accessible controls, and responsive navigation.
+- Browser console: no warnings or errors after desktop and mobile interaction tests.
 
 ## Full-view comparison evidence
 
-The source and implementation were opened consecutively and compared at the same desktop state. The implementation preserves the source hierarchy: fixed identity/navigation bar, large two-line editorial heading, narrow cinematic moving-image strip, three project planes in perspective, active-project metadata, tabular project progress, and compact interaction instructions. The revised spatial alignment places the active plate centrally with both neighbouring projects visible and integrates the metadata panel into the active plane.
+The source and implementation are combined in `design-qa-comparison.jpg` at equal pixel width. Both use the same fixed identity/navigation bar, two-line editorial hero, dark liquid optical field, dominant central artwork specimen, partially visible neighbouring projects, inset metadata rail, minimal project progress, and bottom-right portfolio agent. The implementation intentionally keeps the live shader calmer than the static concept so the portfolio remains readable and performant.
 
 ## Focused-region comparison evidence
 
-- Hero typography: Libre Caslon Display closely matches the source's high-contrast editorial serif; DM Sans provides the compact uppercase metadata and tabular interface hierarchy.
-- Active archive stage: the active plate, two receding plates, role/method/outcome rail, and bottom navigation were inspected at full viewport and after changing projects.
-- Artwork gallery: the main artwork and thumbnail strip were inspected after switching from Anxiety Storm to Loneliness Fog.
-- Mobile hero: navigation, headline wrapping, 3D plate crop, and off-canvas neighbours were inspected at 390 × 844.
+`design-qa-focus.jpg` compares the artwork stage and metadata at the same crop. The authentic project image remains the dominant object, the metadata is attached to the specimen, the asymmetric rounded glass edge is retained, and the title/category/year hierarchy stays legible. The generated source's impossible organic refraction mask is translated into a live caustic shader, curved glass frame, pointer-responsive highlight, and refractive metadata surface rather than a static raster effect.
 
 ## Findings
 
-No actionable P0, P1, or P2 issues remain.
+No actionable P0, P1, or P2 findings remain.
 
-- Fonts and typography: passed. Display and interface families, optical scale, line height, tracking, and hierarchy match the intended editorial/technical contrast. Mobile headline wrapping remains readable.
-- Spacing and layout rhythm: passed. The first QA capture showed the active plate too far left and low, with metadata detached from it. The plate was moved upward and right, its width was normalized, neighbouring planes were rebalanced, and the metadata rail was attached to the active plane. Post-fix evidence matches the source composition at 1440 × 1024.
-- Colors and visual tokens: passed. Near-black/graphite surfaces, warm ivory text, cyan focus states, and restrained coral navigation accents reproduce the intended palette and maintain readable contrast.
-- Image quality and asset fidelity: passed. The implementation uses Yuntong Ke's original full-resolution project images and the original uncompressed background video. The source mockup's representative cloud scene was intentionally replaced with the closest authentic project artwork, `serenity-sky.jpg`, rather than a synthetic placeholder.
-- Copy and content: passed. All three real projects, role/method/outcome metadata, profile information, tools, availability, email, and location are present in English.
-- Interaction and accessibility: passed. Core controls are keyboard focusable, selected states expose `aria-pressed`, project metadata updates through an `aria-live` region, and reduced-motion preferences disable transitions.
-- Responsiveness: passed. No horizontal overflow or clipped navigation was observed at 390 × 844; secondary navigation collapses while Index and Contact remain available.
+- Fonts and typography: passed. Libre Caslon Display and DM Sans preserve the source's editorial serif/interface sans contrast. Desktop size, line height, wrapping, uppercase tracking, and tabular metadata are aligned; mobile no longer overlaps the supporting statement.
+- Spacing and layout rhythm: passed. Header height, hero margins, headline-to-stage overlap, dominant specimen scale, metadata attachment, and project controls follow the source composition. At 390 × 844 the page has no horizontal overflow.
+- Colors and visual tokens: passed. Near-black navy, ivory type, cold cyan refraction, restrained coral highlights, translucent borders, and dimmed secondary projects match the selected direction while preserving accessible text contrast.
+- Image quality and asset fidelity: passed. All visible project images are Yuntong Ke's original assets. The featured image is sharper and more saturated than the previous iteration, remains fully framed in galleries, and no placeholder or simulated artwork was introduced.
+- Copy and content: passed. Existing English portfolio copy, real project titles, role/method/outcome data, contact details, profile, and recognition remain intact.
+- Interaction and accessibility: passed. Project controls update the active state and live metadata, the glass field responds to pointer movement, Ask YK opens and closes correctly, focus styles remain visible, and `prefers-reduced-motion` disables nonessential animation.
+- Performance direction: passed. The 19 MB background video is no longer requested or stored in either production or source assets. The replacement is a low-resolution, low-power WebGL field with capped device pixel ratio and static reduced-motion behaviour.
 
 ## Comparison history
 
 ### Iteration 1
 
-- Earlier P2: the central project plate sat too low and too far left compared with the source, making the left project nearly disappear.
-- Earlier P2: the role/method/outcome panel floated separately over the right project instead of reading as part of the active plane.
-- Fixes: changed the stage anchor from 50%/50% to 60%/40%, reduced active-plane width, adjusted left/right 3D offsets, and placed the metadata panel inside the active plane's right edge with a restrained translucent surface.
-- Post-fix evidence: the 1440 × 1024 capture shows the active project as the dominant centre plane, meaningful portions of both neighbouring projects, and a visually attached metadata rail.
+- Earlier P2: the first implementation kept the stage too tall at common 720 px desktop heights, cutting off the artwork title and controls.
+- Earlier P2: the mobile grid placed the supporting statement in an implicit second column, overlapping the multi-line headline.
+- Fixes: reduced the desktop stage and specimen height, preserved the complete artwork title/control line, changed the mobile heading to a single block flow, increased mobile hero height, and tightened header navigation.
+- Post-fix evidence: the 1672 × 942 capture shows the complete specimen and controls; the 390 × 844 capture shows a readable headline, statement, artwork, and controls with `scrollWidth === innerWidth`.
+
+### Iteration 2
+
+- Earlier P2: the featured artwork appeared flatter and more muted than the selected concept.
+- Fixes: increased authentic artwork saturation/contrast, moved the bottom shade lower, strengthened the live caustic field and glass-edge highlights, and added a persistent refractive sweep to the active specimen.
+- Post-fix evidence: `design-qa-implementation.png` and `design-qa-focus.jpg` show a brighter project image, clearer glass separation, and stronger optical depth without obscuring metadata.
 
 ## Follow-up polish
 
-- P3: the source mockup includes a decorative curved spring trajectory and mini curve graph. The implementation uses a lighter linear progress system and compact spring readout to avoid continuous canvas/WebGL work and preserve performance.
-- P3: project imagery necessarily differs from the generated concept because the portfolio now uses the artist's real work; this is an intentional authenticity improvement.
+- P3: the source mock uses a highly irregular static liquid silhouette. The implementation uses a reproducible live shader and rounded refractive frame, an intentional performance and maintainability trade-off.
+- P3: neighbouring project titles are deliberately clipped at the viewport edges to signal horizontal exploration; their full titles remain available through accessible labels and after selection.
 
 ## Implementation checklist
 
-- [x] Faithful 3D archive hero
-- [x] Original uncompressed background video retained
-- [x] Three real projects integrated
-- [x] Drag, click, keyboard, and anchor interactions working
+- [x] Selected Living Glass direction recreated with authentic portfolio assets
+- [x] Background video removed and replaced with live optical shader
+- [x] Project switching and metadata rail working
+- [x] Ask YK preserved and tested
 - [x] Desktop and mobile layouts verified
+- [x] Reduced-motion behaviour retained
 - [x] Production build completed
 - [x] Browser console clean
 

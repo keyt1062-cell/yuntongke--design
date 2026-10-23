@@ -93,8 +93,27 @@ function AtmosphereCanvas({ palette }) {
       uniform vec3 uColorA;
       uniform vec3 uColorB;
 
-      float grain(vec2 p) {
+      float hash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+                   mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        for (int i = 0; i < 4; i++) {
+          value += noise(p) * amplitude;
+          p = mat2(1.6, -1.2, 1.2, 1.6) * p + 0.17;
+          amplitude *= 0.5;
+        }
+        return value;
       }
 
       void main() {
@@ -104,27 +123,39 @@ function AtmosphereCanvas({ palette }) {
         vec2 pointer = vec2(uPointer.x * 2.0 - 1.0, (1.0 - uPointer.y) * 2.0 - 1.0);
         pointer.x *= safeResolution.x / safeResolution.y;
 
-        float drift = sin(p.x * 1.25 + uTime * 0.16 + sin(p.y * 1.8 - uTime * 0.11));
-        drift += cos(p.y * 1.55 - uTime * 0.13 + p.x * 0.7);
-        drift = drift * 0.25 + 0.5;
+        float t = uTime * 0.075;
+        vec2 flow = vec2(fbm(p * 1.18 + vec2(t, -t * 0.7)), fbm(p * 1.34 + vec2(-t * 0.55, t)));
+        vec2 warped = p + (flow - 0.5) * 0.42;
+        float silk = fbm(warped * 2.2 + vec2(t * 0.8, -t));
+        float contour = sin((warped.x * 2.1 + warped.y * 1.35 + silk * 2.8) * 4.0 - t * 2.0);
+        float caustic = pow(max(0.0, contour * 0.5 + 0.5), 7.0);
 
-        float halo = exp(-length(p - pointer) * 1.65);
-        float ripple = sin(length(p - pointer) * 15.0 - uTime * 1.8) * halo;
-        float scrollWave = sin((p.y + uScroll * 2.4) * 2.1 + uTime * 0.08) * 0.5 + 0.5;
-        float field = smoothstep(0.08, 0.96, drift * 0.62 + scrollWave * 0.38 + ripple * 0.07);
+        vec2 lensCenter = vec2(-0.22, 0.12);
+        lensCenter += (pointer - lensCenter) * 0.035;
+        vec2 lensP = p - lensCenter;
+        lensP.x *= 0.82;
+        float lensWarp = fbm(lensP * 2.8 + vec2(t, -t)) * 0.075;
+        float lensDistance = length(lensP) - (0.61 + lensWarp);
+        float lens = 1.0 - smoothstep(-0.02, 0.055, lensDistance);
+        float rim = 1.0 - smoothstep(0.0, 0.038, abs(lensDistance));
+        float innerGlow = exp(-abs(lensDistance) * 18.0) * lens;
 
-        vec3 color = mix(vec3(0.014, 0.024, 0.038), uColorA, field * 0.58);
-        color = mix(color, uColorB, smoothstep(0.28, 1.1, length(p + vec2(0.48, -0.18))) * 0.35);
-        color += uColorA * halo * (0.10 + uVelocity * 0.08);
+        float halo = exp(-length(p - pointer) * 1.8);
+        float ripple = sin(length(p - pointer) * 18.0 - uTime * 1.25) * halo;
+        vec3 color = vec3(0.009, 0.015, 0.024);
+        color += mix(uColorA, uColorB, silk) * (0.11 + silk * 0.18);
+        color += vec3(0.42, 0.78, 0.94) * caustic * 0.23;
+        color = mix(color, color * 1.36 + vec3(0.05, 0.085, 0.115), lens * 0.76);
+        color += vec3(0.55, 0.86, 1.0) * rim * 0.42;
+        color += vec3(1.0, 0.43, 0.31) * rim * smoothstep(-0.15, 0.55, lensP.x) * 0.26;
+        color += vec3(0.84, 0.94, 1.0) * innerGlow * 0.16;
+        color += uColorA * max(0.0, ripple) * 0.025;
+        color += uColorA * halo * (0.035 + uVelocity * 0.04);
 
-        vec2 gridUv = abs(fract(uv * vec2(26.0, 16.0) + vec2(uScroll * 0.28, 0.0)) - 0.5);
-        float grid = 1.0 - smoothstep(0.47, 0.5, max(gridUv.x, gridUv.y));
-        color += vec3(0.12, 0.23, 0.28) * grid * 0.025;
-        color += (grain(gl_FragCoord.xy + uTime) - 0.5) * 0.025;
-
-        float vignette = smoothstep(1.35, 0.22, length(p * vec2(0.76, 0.92)));
-        color *= 0.68 + vignette * 0.42;
-        gl_FragColor = vec4(color, 0.96);
+        float vignette = smoothstep(1.55, 0.24, length(p * vec2(0.72, 0.9)));
+        color *= 0.58 + vignette * 0.52;
+        color += (hash(gl_FragCoord.xy + uTime) - 0.5) * 0.018;
+        gl_FragColor = vec4(color, 0.985);
       }
     `;
 
@@ -382,6 +413,7 @@ function ProjectPlate({ project, position, dragX, onSelect }) {
       <span className="plate-light" aria-hidden="true" />
       <span className="plate-index">{project.number}</span>
       <span className="plate-copy"><strong>{project.title}</strong><small>{project.year}</small></span>
+      <span className="plate-category">{project.category}</span>
     </button>
   );
 }
@@ -764,12 +796,7 @@ function App() {
 
       <main>
         <section className="archive-hero" id="home">
-          <div className="kinetic-rail" aria-hidden="true"><span>IMAGINED SYSTEMS · CULTURAL FUTURES · MACHINE DREAMS ·&nbsp;</span><span>IMAGINED SYSTEMS · CULTURAL FUTURES · MACHINE DREAMS ·&nbsp;</span></div>
-          <div className="film-strip" aria-hidden="true">
-            <video autoPlay muted loop playsInline preload="auto" poster={asset("optimized/emotional-weather/anxiety-storm.jpg")}>
-              <source src={asset("assets/video/hero-background.mp4")} type="video/mp4" />
-            </video>
-          </div>
+          <div className="optical-field-label" aria-hidden="true"><span>PERCEPTION FIELD</span><i>LIVE / 0.82</i></div>
           <div className="hero-status"><i />Independent visual designer <span>Beijing / Available worldwide</span></div>
           <div className="hero-heading">
             <p>2024 <span /> 2026</p>
