@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const asset = (path) => `${import.meta.env.BASE_URL}${path}`;
+const thumbnailAsset = (path) => path.replace(/\.(?:jpe?g|png|webp)$/i, "-thumb.webp");
+const displayAsset = (path) => path.replace(/\.(?:jpe?g|png|webp)$/i, "-display.webp");
 
 const archiveProjects = [
   {
@@ -14,7 +16,7 @@ const archiveProjects = [
   },
   {
     id: "weather", number: "01", year: "2024", title: "Emotional Weather Bureau",
-    image: "optimized/emotional-weather/serenity-sky.jpg", category: "AIGC concept art / speculative design",
+    image: "optimized/emotional-weather/serenity-sky.webp", category: "AIGC concept art / speculative design",
     role: "Concept, AI art direction, editing and sequencing",
     methods: "Concept mapping, prompt iteration, visual selection and retouching",
     outcome: "An eight-part visual weather system",
@@ -33,14 +35,14 @@ const archiveProjects = [
 ];
 
 const weatherWorks = [
-  ["Anxiety Storm", "optimized/emotional-weather/anxiety-storm.jpg"],
-  ["Loneliness Fog", "optimized/emotional-weather/loneliness-fog.jpg"],
-  ["Nostalgia Monsoon", "optimized/emotional-weather/nostalgia-monsoon.jpg"],
-  ["Anger Thunderstorm", "optimized/emotional-weather/anger-thunderstorm.jpg"],
-  ["Hope Aurora", "optimized/emotional-weather/hope-aurora.jpg"],
-  ["Algorithm Cold Wave", "optimized/emotional-weather/algorithm-cold-wave.jpg"],
-  ["Serenity Sky", "optimized/emotional-weather/serenity-sky.jpg"],
-  ["Social Media Sandstorm", "optimized/emotional-weather/social-media-sandstorm.jpg"],
+  ["Anxiety Storm", "optimized/emotional-weather/anxiety-storm.webp"],
+  ["Loneliness Fog", "optimized/emotional-weather/loneliness-fog.webp"],
+  ["Nostalgia Monsoon", "optimized/emotional-weather/nostalgia-monsoon.webp"],
+  ["Anger Thunderstorm", "optimized/emotional-weather/anger-thunderstorm.webp"],
+  ["Hope Aurora", "optimized/emotional-weather/hope-aurora.webp"],
+  ["Algorithm Cold Wave", "optimized/emotional-weather/algorithm-cold-wave.webp"],
+  ["Serenity Sky", "optimized/emotional-weather/serenity-sky.webp"],
+  ["Social Media Sandstorm", "optimized/emotional-weather/social-media-sandstorm.webp"],
 ];
 
 const syntheticWorks = [
@@ -202,13 +204,16 @@ function AtmosphereCanvas({ palette }) {
     let previousScroll = window.scrollY;
     let velocity = 0;
     let frame = 0;
-    let running = true;
+    let pageVisible = !document.hidden;
+    let heroVisible = true;
     let lastTime = performance.now();
+    let lastPaint = 0;
+    const frameInterval = window.innerWidth < 720 ? 1000 / 30 : 1000 / 45;
     let colorA = [...paletteRef.current[0]];
     let colorB = [...paletteRef.current[1]];
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 720 ? 1 : 1.35);
+      const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 720 ? 0.75 : 1);
       const width = Math.max(1, Math.round(window.innerWidth * dpr));
       const height = Math.max(1, Math.round(window.innerHeight * dpr));
       if (canvas.width !== width || canvas.height !== height) {
@@ -221,7 +226,13 @@ function AtmosphereCanvas({ palette }) {
       pointerTarget.y = event.clientY / Math.max(window.innerHeight, 1);
     };
     const render = (now) => {
-      if (!running) return;
+      frame = 0;
+      if (!pageVisible || !heroVisible) return;
+      if (!reducedMotion && now - lastPaint < frameInterval) {
+        frame = requestAnimationFrame(render);
+        return;
+      }
+      lastPaint = now;
       resize();
       const delta = Math.min(32, now - lastTime); lastTime = now;
       const range = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
@@ -243,18 +254,29 @@ function AtmosphereCanvas({ palette }) {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (!reducedMotion) frame = requestAnimationFrame(render);
     };
-    const onVisibility = () => {
-      running = !document.hidden;
-      if (running && !reducedMotion) { lastTime = performance.now(); frame = requestAnimationFrame(render); }
-      else if (frame) cancelAnimationFrame(frame);
+    const schedule = () => {
+      if (!frame && pageVisible && heroVisible) frame = requestAnimationFrame(render);
     };
+    const onVisibility = () => {
+      pageVisible = !document.hidden;
+      if (pageVisible) { lastTime = performance.now(); schedule(); }
+      else if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    };
+    const hero = document.querySelector(".archive-hero");
+    const heroObserver = new IntersectionObserver(([entry]) => {
+      heroVisible = entry.isIntersecting;
+      if (heroVisible) schedule();
+      else if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    }, { rootMargin: "12% 0px" });
+    if (hero) heroObserver.observe(hero);
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     render(performance.now());
 
     return () => {
-      running = false;
+      pageVisible = false;
       if (frame) cancelAnimationFrame(frame);
+      heroObserver.disconnect();
       window.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("visibilitychange", onVisibility);
       gl.deleteBuffer(buffer); gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment);
@@ -275,7 +297,10 @@ function ParticleField() {
     const pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.45, active: false };
     let particles = [];
     let frame = 0;
-    let running = true;
+    let pageVisible = !document.hidden;
+    let heroVisible = true;
+    let lastPaint = 0;
+    const frameInterval = window.innerWidth < 720 ? 1000 / 30 : 1000 / 45;
     let previousScroll = window.scrollY;
     let scrollEnergy = 0;
 
@@ -294,13 +319,19 @@ function ParticleField() {
       canvas.height = Math.max(1, Math.round(height));
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-      const desired = width < 720 ? 38 : Math.min(96, Math.round(width / 17));
+      const desired = width < 720 ? 24 : Math.min(72, Math.round(width / 22));
       if (particles.length !== desired) particles = Array.from({ length: desired }, () => createParticle());
     };
     const onPointerMove = (event) => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; };
     const onPointerLeave = () => { pointer.active = false; };
-    const draw = () => {
-      if (!running) return;
+    const draw = (now = performance.now()) => {
+      frame = 0;
+      if (!pageVisible || !heroVisible) return;
+      if (!reducedMotion && now - lastPaint < frameInterval) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
+      lastPaint = now;
       const width = canvas.width;
       const height = canvas.height;
       const currentScroll = window.scrollY;
@@ -349,11 +380,21 @@ function ParticleField() {
       context.globalCompositeOperation = "source-over";
       if (!reducedMotion) frame = requestAnimationFrame(draw);
     };
-    const onVisibility = () => {
-      running = !document.hidden;
-      if (running && !reducedMotion) frame = requestAnimationFrame(draw);
-      else if (frame) cancelAnimationFrame(frame);
+    const schedule = () => {
+      if (!frame && pageVisible && heroVisible) frame = requestAnimationFrame(draw);
     };
+    const onVisibility = () => {
+      pageVisible = !document.hidden;
+      if (pageVisible) schedule();
+      else if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    };
+    const hero = document.querySelector(".archive-hero");
+    const heroObserver = new IntersectionObserver(([entry]) => {
+      heroVisible = entry.isIntersecting;
+      if (heroVisible) schedule();
+      else if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    }, { rootMargin: "12% 0px" });
+    if (hero) heroObserver.observe(hero);
     resize();
     window.addEventListener("resize", resize, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
@@ -361,8 +402,9 @@ function ParticleField() {
     document.addEventListener("visibilitychange", onVisibility);
     draw();
     return () => {
-      running = false;
+      pageVisible = false;
       if (frame) cancelAnimationFrame(frame);
+      heroObserver.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
@@ -406,9 +448,9 @@ function ProjectPlate({ project, position, dragX, onSelect }) {
     <button
       className={`archive-plate archive-plate-${position} ${isActive ? "is-active" : ""}`}
       style={{ "--drag-x": `${dragX}px` }} type="button"
-      onClick={() => onSelect(project.id)} aria-label={`View ${project.title}`} aria-pressed={isActive}
+      onClick={() => onSelect(project.id)} aria-pressed={isActive}
     >
-      <img src={asset(project.image)} alt="" draggable="false" fetchPriority={isActive ? "high" : "auto"} />
+      <img src={asset(isActive ? displayAsset(project.image) : thumbnailAsset(project.image))} alt="" draggable="false" fetchPriority={isActive ? "high" : "low"} />
       <span className="plate-shade" aria-hidden="true" />
       <span className="plate-light" aria-hidden="true" />
       <span className="plate-index">{project.number}</span>
@@ -452,7 +494,15 @@ function WorkGallery({ items, label }) {
     <div className="work-gallery">
       <figure className="work-gallery-main" onPointerMove={moveLight}>
         <button className="work-gallery-image-button" type="button" onClick={() => setIsLightboxOpen(true)} aria-label={`Open ${items[active][0]} in fullscreen`}>
-          <img key={items[active][1]} src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
+          <img
+            key={items[active][1]}
+            src={asset(displayAsset(items[active][1]))}
+            srcSet={`${asset(thumbnailAsset(items[active][1]))} 420w, ${asset(displayAsset(items[active][1]))} 720w, ${asset(items[active][1])} 1000w`}
+            sizes="(max-width: 720px) calc(100vw - 38px), (max-width: 1200px) calc(100vw - 12vw), 1120px"
+            alt={items[active][0]}
+            loading="lazy"
+            decoding="async"
+          />
           <span className="fullscreen-hint"><i aria-hidden="true" />View fullscreen</span>
         </button>
         <figcaption aria-live="polite"><span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span><strong>{items[active][0]}</strong></figcaption>
@@ -461,10 +511,10 @@ function WorkGallery({ items, label }) {
           <button type="button" onClick={() => selectRelative(1)} aria-label="Next artwork">→</button>
         </div>
       </figure>
-      <div className="work-gallery-list" role="list" aria-label={label} style={{ "--item-count": Math.min(items.length, 9) }}>
+      <div className="work-gallery-list" role="group" aria-label={label} style={{ "--item-count": Math.min(items.length, 9) }}>
         {items.map(([title, src], index) => (
           <button key={src} className={index === active ? "is-active" : ""} type="button" onClick={() => setActive(index)} aria-pressed={index === active}>
-            <img src={asset(src)} alt="" loading="lazy" decoding="async" />
+            <img src={asset(thumbnailAsset(src))} alt="" loading="lazy" decoding="async" />
             <span><i>{String(index + 1).padStart(2, "0")}</i>{title}</span>
           </button>
         ))}
@@ -635,6 +685,7 @@ function PortfolioAgent() {
   return (
     <aside className={`portfolio-agent ${isOpen ? "is-open" : ""}`} aria-label="Portfolio assistant">
       <button className="agent-orb" type="button" onClick={() => setIsOpen((value) => !value)} aria-expanded={isOpen} aria-controls="portfolio-agent-panel">
+        <span className="sr-only">{isOpen ? "Close" : "Open"} YK portfolio agent</span>
         <span className="agent-orb-core" aria-hidden="true"><i /><i /><i /></span>
         <span><strong>Ask YK</strong><small>Portfolio agent</small></span>
       </button>
@@ -783,7 +834,7 @@ function App() {
       <div className="page-progress" aria-hidden="true"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
       <a className="skip-link" href="#selected-work">Skip to selected work</a>
       <header className="site-header">
-        <a className="identity" href="#home" aria-label="Yuntong Ke home">
+        <a className="identity" href="#home">
           <span className="identity-mark">YK</span><span><strong>Yuntong Ke</strong><small>Visual Design / AIGC / Narrative</small></span>
         </a>
         <nav aria-label="Primary navigation">
