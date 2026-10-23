@@ -39,6 +39,8 @@ const weatherWorks = [
   ["Anger Thunderstorm", "optimized/emotional-weather/anger-thunderstorm.jpg"],
   ["Hope Aurora", "optimized/emotional-weather/hope-aurora.jpg"],
   ["Algorithm Cold Wave", "optimized/emotional-weather/algorithm-cold-wave.jpg"],
+  ["Serenity Sky", "optimized/emotional-weather/serenity-sky.jpg"],
+  ["Social Media Sandstorm", "optimized/emotional-weather/social-media-sandstorm.jpg"],
 ];
 
 const syntheticWorks = [
@@ -386,6 +388,29 @@ function ProjectPlate({ project, position, dragX, onSelect }) {
 
 function WorkGallery({ items, label }) {
   const [active, setActive] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const closeRef = useRef(null);
+  const lastFocusRef = useRef(null);
+  const selectRelative = (direction) => setActive((current) => (current + direction + items.length) % items.length);
+
+  useEffect(() => {
+    if (!isLightboxOpen) return undefined;
+    lastFocusRef.current = document.activeElement;
+    document.body.classList.add("lightbox-open");
+    closeRef.current?.focus();
+    const handleKey = (event) => {
+      if (event.key === "Escape") setIsLightboxOpen(false);
+      if (event.key === "ArrowLeft") selectRelative(-1);
+      if (event.key === "ArrowRight") selectRelative(1);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.body.classList.remove("lightbox-open");
+      window.removeEventListener("keydown", handleKey);
+      lastFocusRef.current?.focus?.();
+    };
+  }, [isLightboxOpen, items.length]);
+
   const moveLight = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--gallery-x", `${event.clientX - bounds.left}px`);
@@ -394,8 +419,15 @@ function WorkGallery({ items, label }) {
   return (
     <div className="work-gallery">
       <figure className="work-gallery-main" onPointerMove={moveLight}>
-        <img key={items[active][1]} src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
-        <figcaption><span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span><strong>{items[active][0]}</strong></figcaption>
+        <button className="work-gallery-image-button" type="button" onClick={() => setIsLightboxOpen(true)} aria-label={`Open ${items[active][0]} in fullscreen`}>
+          <img key={items[active][1]} src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
+          <span className="fullscreen-hint"><i aria-hidden="true" />View fullscreen</span>
+        </button>
+        <figcaption aria-live="polite"><span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span><strong>{items[active][0]}</strong></figcaption>
+        <div className="gallery-step-controls" aria-label="Artwork navigation">
+          <button type="button" onClick={() => selectRelative(-1)} aria-label="Previous artwork">←</button>
+          <button type="button" onClick={() => selectRelative(1)} aria-label="Next artwork">→</button>
+        </div>
       </figure>
       <div className="work-gallery-list" role="list" aria-label={label} style={{ "--item-count": Math.min(items.length, 9) }}>
         {items.map(([title, src], index) => (
@@ -405,11 +437,29 @@ function WorkGallery({ items, label }) {
           </button>
         ))}
       </div>
+      {isLightboxOpen && (
+        <div className="artwork-lightbox" role="dialog" aria-modal="true" aria-label={`${label}: ${items[active][0]}`} onPointerDown={(event) => { if (event.target === event.currentTarget) setIsLightboxOpen(false); }}>
+          <div className="lightbox-topline">
+            <span>{label}</span>
+            <span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span>
+            <button ref={closeRef} type="button" onClick={() => setIsLightboxOpen(false)}>Close <i>×</i></button>
+          </div>
+          <figure>
+            <img key={`lightbox-${items[active][1]}`} src={asset(items[active][1])} alt={items[active][0]} />
+            <figcaption>{items[active][0]}</figcaption>
+          </figure>
+          <div className="lightbox-controls">
+            <button type="button" onClick={() => selectRelative(-1)} aria-label="Previous artwork">← <span>Previous</span></button>
+            <small>Use arrow keys to explore · Esc to close</small>
+            <button type="button" onClick={() => selectRelative(1)} aria-label="Next artwork"><span>Next</span> →</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ProjectSection({ project, eyebrow, statement, items }) {
+function ProjectSection({ project, eyebrow, statement, items, process, nextProject }) {
   return (
     <section className="project-case" id={project.anchor} data-project={project.number}>
       <div className="project-case-heading" data-reveal>
@@ -423,8 +473,166 @@ function ProjectSection({ project, eyebrow, statement, items }) {
           <div><dt>Outcome</dt><dd>{project.outcome}</dd></div>
         </dl>
       </div>
+      <ol className="process-line" aria-label={`${project.title} process`} data-reveal>
+        {process.map((step, index) => <li key={step}><i>{String(index + 1).padStart(2, "0")}</i><span>{step}</span></li>)}
+      </ol>
       <div data-reveal><WorkGallery items={items} label={`${project.title} artwork`} /></div>
+      <a className="next-project" href={`#${nextProject.anchor}`} data-reveal>
+        <span>Continue to project {nextProject.number}</span><strong>{nextProject.title}</strong><i aria-hidden="true">↘</i>
+      </a>
     </section>
+  );
+}
+
+const portfolioKnowledge = [
+  {
+    id: "profile",
+    keywords: "who about yuntong ke 柯雲童 柯云童 designer profile education based location background 介绍 关于 教育 学校",
+    text: "Yuntong Ke is an independent visual designer and Digital Media Art student at Chengdu College of Arts and Sciences, currently based in Beijing, China. Her practice connects cultural research, speculative storytelling, AIGC, moving image and digital experience.",
+  },
+  {
+    id: "practice",
+    keywords: "practice focus skill tools software 方法 技能 软件 工具 擅长 方向",
+    text: "Yuntong focuses on AIGC, visual narrative, interaction and culturally grounded creative direction. Her tools include Photoshop, Illustrator, After Effects, Cinema 4D, Maya and Unity. She treats emerging technology as a creative material rather than a replacement for critical design decisions.",
+  },
+  {
+    id: "weather",
+    keywords: "emotional weather bureau anxiety loneliness nostalgia anger hope algorithm serenity sandstorm project 情绪 天气 项目",
+    text: "Emotional Weather Bureau (2024) is an eight-part AIGC concept-art system that translates inner states into environmental weather. The sequence includes Anxiety Storm, Loneliness Fog, Nostalgia Monsoon, Anger Thunderstorm, Hope Aurora, Algorithm Cold Wave, Serenity Sky and Social Media Sandstorm. Yuntong led concept development, AI art direction, editing and sequencing.",
+  },
+  {
+    id: "archive",
+    keywords: "synthetic perception archive ai machine cognition memory signal emotion entity project 合成 感知 档案 人工智能 项目",
+    text: "Synthetic Perception Archive (2025) is a speculative future-museum interface about how AI might reconstruct — and misread — emotion, memory, space and fear. Its four records are Emotion Entity 03, Memory Compression Device, Perception Zone and Signal Collapse. Yuntong developed the world, taxonomy, visual direction and interface narrative.",
+  },
+  {
+    id: "heritage",
+    keywords: "shanxi heritage dragon mythology yungang hanging temple pagoda datong mingtang chunyang daiwang drum tower white pagoda 山西 龙 云冈 悬空寺 应县木塔 大同 古建 项目",
+    text: "Shanxi Heritage × Dragon Mythology (2026) reframes architectural memory through a recurring Chinese dragon. The series contains nine works: Yungang Grottoes, Hanging Temple, Yingxian Pagoda, Datong Wall, Mingtang Heritage Park, Chunyang Palace, Daiwang Palace, Drum Tower and White Pagoda. Its four-stage process was: research the sites, extract motifs, develop a shared visual language, then standardise the full series. Yuntong led research, concept development, AI art direction and layout.",
+  },
+  {
+    id: "recognition",
+    keywords: "award recognition prize competition 获奖 奖项 比赛 荣誉",
+    text: "Selected recognition includes a National Third Prize and Provincial Second Prize in the 17th National College Student Advertising Art Competition, selection for the Sichuan Student Innovation & Entrepreneurship Programme, and a Provincial Third Prize in the Sichuan Student Digital Media Art & Design Competition.",
+  },
+  {
+    id: "contact",
+    keywords: "contact email collaborate commission available hire work study 联系 邮箱 合作 委托",
+    text: "Yuntong is available for study, commissions and international collaboration. Contact her directly at keyuntong@126.com.",
+  },
+];
+
+const agentSuggestions = [
+  "Which project best shows her design process?",
+  "Tell me about the Shanxi heritage series.",
+  "What tools and methods does Yuntong use?",
+];
+
+const normaliseQuery = (value) => value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff\s]/g, " ").split(/\s+/).filter(Boolean);
+
+function retrieveKnowledge(query, limit = 3) {
+  const tokens = normaliseQuery(query);
+  const scored = portfolioKnowledge.map((entry) => {
+    const haystack = `${entry.keywords} ${entry.text}`.toLowerCase();
+    const keywordTokens = normaliseQuery(entry.keywords);
+    const directScore = tokens.reduce((total, token) => total + (haystack.includes(token) ? Math.max(1, token.length) : 0), 0);
+    const reverseScore = keywordTokens.reduce((total, token) => total + (query.toLowerCase().includes(token) ? Math.max(2, token.length * 2) : 0), 0);
+    const score = directScore + reverseScore;
+    return { ...entry, score };
+  }).sort((a, b) => b.score - a.score);
+  return (scored[0]?.score > 0 ? scored : portfolioKnowledge.slice(0, 3)).slice(0, limit);
+}
+
+function localPortfolioAnswer(query, matches) {
+  const lower = query.toLowerCase();
+  const chinese = /[\u4e00-\u9fff]/.test(query);
+  const joined = matches.map((item) => item.text).join(" ");
+  if (/email|contact|reach|联系|邮箱|合作/.test(lower)) return chinese ? "你可以通过 keyuntong@126.com 联系柯雲童。她目前接受升学交流、设计委托与国际合作。" : "You can reach Yuntong at keyuntong@126.com. She is available for study, commissions and international collaboration.";
+  if (/which|best|recommend|strongest|哪个|推荐|最能/.test(lower)) return chinese ? "如果你想快速理解她的设计方法，我建议先看《山西文化遗产 × 龙神话》：它最完整地呈现了从场地研究、母题提取、视觉语言开发到九张系列标准化的过程。之后可看《情绪气象局》，了解她如何把抽象情绪转译成视觉系统。" : "Start with Shanxi Heritage × Dragon Mythology: it most clearly shows her process from site research and motif extraction to visual-language development and a consistent nine-piece system. Then view Emotional Weather Bureau to see how she translates abstract emotions into a visual system.";
+  return chinese ? `根据作品集资料：${joined}` : joined;
+}
+
+function PortfolioAgent() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+  const [messages, setMessages] = useState([
+    { role: "assistant", text: "Hi — I’m YK Archive Agent. Ask me about Yuntong’s projects, process, skills or availability.", source: "Portfolio knowledge" },
+  ]);
+  const inputRef = useRef(null);
+  const logRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) window.setTimeout(() => inputRef.current?.focus(), 120);
+  }, [isOpen]);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, isThinking]);
+
+  const ask = async (rawQuestion) => {
+    const question = rawQuestion.trim().slice(0, 420);
+    if (!question || isThinking) return;
+    const matches = retrieveKnowledge(question);
+    const fallback = localPortfolioAnswer(question, matches);
+    setMessages((current) => [...current, { role: "user", text: question }]);
+    setInput("");
+    setIsThinking(true);
+    try {
+      const endpoint = window.__PORTFOLIO_AGENT_ENDPOINT__ || "https://yuntongke-portfolio-agent.netlify.app/api/portfolio-agent";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          context: matches.map(({ id, text }) => ({ id, text })),
+          history: messages.slice(-4).map(({ role, text }) => ({ role, content: text })),
+        }),
+      });
+      if (!response.ok) throw new Error("Agent service unavailable");
+      const payload = await response.json();
+      if (!payload.answer) throw new Error("Empty answer");
+      setMessages((current) => [...current, { role: "assistant", text: payload.answer, source: "Qwen · grounded in portfolio" }]);
+    } catch {
+      setMessages((current) => [...current, { role: "assistant", text: fallback, source: "Local portfolio answer" }]);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  return (
+    <aside className={`portfolio-agent ${isOpen ? "is-open" : ""}`} aria-label="Portfolio assistant">
+      <button className="agent-orb" type="button" onClick={() => setIsOpen((value) => !value)} aria-expanded={isOpen} aria-controls="portfolio-agent-panel">
+        <span className="agent-orb-core" aria-hidden="true"><i /><i /><i /></span>
+        <span><strong>Ask YK</strong><small>Portfolio agent</small></span>
+      </button>
+      <section className="agent-panel" id="portfolio-agent-panel" aria-hidden={!isOpen}>
+        <header>
+          <div><span className="agent-live"><i />Online</span><strong>YK Archive Agent</strong><small>Answers from this portfolio · powered by Qwen</small></div>
+          <button type="button" onClick={() => setIsOpen(false)} aria-label="Close portfolio agent">×</button>
+        </header>
+        <div className="agent-messages" ref={logRef} role="log" aria-live="polite">
+          {messages.map((message, index) => (
+            <div className={`agent-message is-${message.role}`} key={`${message.role}-${index}`}>
+              <span>{message.role === "assistant" ? "YK" : "You"}</span>
+              <p>{message.text}</p>
+              {message.source && <small>{message.source}</small>}
+            </div>
+          ))}
+          {isThinking && <div className="agent-message is-assistant is-thinking"><span>YK</span><p><i /><i /><i /></p><small>Reading the archive</small></div>}
+        </div>
+        {messages.length < 3 && (
+          <div className="agent-suggestions">
+            {agentSuggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => ask(suggestion)}>{suggestion}<i>↗</i></button>)}
+          </div>
+        )}
+        <form onSubmit={(event) => { event.preventDefault(); ask(input); }}>
+          <label htmlFor="agent-question">Ask about the work</label>
+          <div><input ref={inputRef} id="agent-question" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Type your question…" maxLength="420" autoComplete="off" /><button type="submit" disabled={!input.trim() || isThinking} aria-label="Send question">↑</button></div>
+          <small>Public access · no login required</small>
+        </form>
+      </section>
+    </aside>
   );
 }
 
@@ -448,6 +656,7 @@ function App() {
 
   useEffect(() => {
     const handleKey = (event) => {
+      if (document.body.classList.contains("lightbox-open")) return;
       if (event.key === "ArrowLeft") selectByIndex(activeIndex - 1);
       if (event.key === "ArrowRight") selectByIndex(activeIndex + 1);
     };
@@ -470,7 +679,11 @@ function App() {
     const sectionNodes = [...document.querySelectorAll("main > section[id]")];
     const sectionObserver = new IntersectionObserver((entries) => {
       const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (visible) setCurrentSection(visible.target.id);
+      if (visible) {
+        setCurrentSection(visible.target.id);
+        const matchingProject = archiveProjects.find((project) => project.anchor === visible.target.id);
+        if (matchingProject) setActiveId(matchingProject.id);
+      }
     }, { rootMargin: "-35% 0px -55%", threshold: [0, 0.1, 0.5] });
     sectionNodes.forEach((node) => sectionObserver.observe(node));
 
@@ -534,7 +747,9 @@ function App() {
       <AtmosphereCanvas palette={atmospherePalettes[activeId]} />
       <ParticleField />
       <CursorLens />
+      <PortfolioAgent />
       <div className="page-progress" aria-hidden="true"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
+      <a className="skip-link" href="#selected-work">Skip to selected work</a>
       <header className="site-header">
         <a className="identity" href="#home" aria-label="Yuntong Ke home">
           <span className="identity-mark">YK</span><span><strong>Yuntong Ke</strong><small>Visual Design / AIGC / Narrative</small></span>
@@ -589,9 +804,9 @@ function App() {
           <p>Each project moves from a question or cultural reference to a coherent visual language, combining critical context with emerging image-making tools.</p>
         </section>
 
-        <ProjectSection project={archiveProjects[1]} eyebrow="AIGC concept art / speculative design" statement="Translating inner states into environmental systems." items={weatherWorks} />
-        <ProjectSection project={archiveProjects[0]} eyebrow="Synthetic archive / future museum" statement="Using machine error as material, not as a neutral tool." items={syntheticWorks} />
-        <ProjectSection project={archiveProjects[2]} eyebrow="Cultural heritage / visual identity" statement="Reframing architectural memory through a shared mythology." items={heritageWorks} />
+        <ProjectSection project={archiveProjects[1]} eyebrow="AIGC concept art / speculative design" statement="Translating inner states into environmental systems." items={weatherWorks} process={["Map emotion", "Define atmosphere", "Iterate imagery", "Edit the system"]} nextProject={archiveProjects[0]} />
+        <ProjectSection project={archiveProjects[0]} eyebrow="Synthetic archive / future museum" statement="Using machine error as material, not as a neutral tool." items={syntheticWorks} process={["Build taxonomy", "Generate artefacts", "Test the interface", "Frame the fiction"]} nextProject={archiveProjects[2]} />
+        <ProjectSection project={archiveProjects[2]} eyebrow="Cultural heritage / visual identity" statement="Reframing architectural memory through a shared mythology." items={heritageWorks} process={["Research sites", "Extract motifs", "Develop a visual language", "Standardise the series"]} nextProject={{ anchor: "profile", number: "—", title: "Profile & practice" }} />
 
         <section className="profile-section" id="profile">
           <div><span>Profile / Practice</span><h2>I connect cultural research, speculative storytelling and digital experience.</h2></div>
