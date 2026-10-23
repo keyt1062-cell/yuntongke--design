@@ -63,8 +63,9 @@ function ProjectPlate({ project, position, dragX, onSelect }) {
       style={{ "--drag-x": `${dragX}px` }} type="button"
       onClick={() => onSelect(project.id)} aria-label={`View ${project.title}`} aria-pressed={isActive}
     >
-      <img src={asset(project.image)} alt="" draggable="false" />
+      <img src={asset(project.image)} alt="" draggable="false" fetchPriority={isActive ? "high" : "auto"} />
       <span className="plate-shade" aria-hidden="true" />
+      <span className="plate-light" aria-hidden="true" />
       <span className="plate-index">{project.number}</span>
       <span className="plate-copy"><strong>{project.title}</strong><small>{project.year}</small></span>
     </button>
@@ -82,7 +83,8 @@ function WorkGallery({ items, label }) {
       <div className="work-gallery-list" role="list" aria-label={label}>
         {items.map(([title, src], index) => (
           <button key={src} className={index === active ? "is-active" : ""} type="button" onClick={() => setActive(index)} aria-pressed={index === active}>
-            <img src={asset(src)} alt="" loading="lazy" decoding="async" /><span>{title}</span>
+            <img src={asset(src)} alt="" loading="lazy" decoding="async" />
+            <span><i>{String(index + 1).padStart(2, "0")}</i>{title}</span>
           </button>
         ))}
       </div>
@@ -92,11 +94,11 @@ function WorkGallery({ items, label }) {
 
 function ProjectSection({ project, eyebrow, statement, items }) {
   return (
-    <section className="project-case" id={project.anchor}>
-      <div className="project-case-heading">
+    <section className="project-case" id={project.anchor} data-project={project.number}>
+      <div className="project-case-heading" data-reveal>
         <span>{project.number}</span><p>{eyebrow}</p><h2>{project.title}</h2><h3>{statement}</h3>
       </div>
-      <div className="project-case-intro">
+      <div className="project-case-intro" data-reveal>
         <p>{project.description}</p>
         <dl>
           <div><dt>Role</dt><dd>{project.role}</dd></div>
@@ -104,7 +106,7 @@ function ProjectSection({ project, eyebrow, statement, items }) {
           <div><dt>Outcome</dt><dd>{project.outcome}</dd></div>
         </dl>
       </div>
-      <WorkGallery items={items} label={`${project.title} artwork`} />
+      <div data-reveal><WorkGallery items={items} label={`${project.title} artwork`} /></div>
     </section>
   );
 }
@@ -113,6 +115,9 @@ function App() {
   const [activeId, setActiveId] = useState("weather");
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [currentSection, setCurrentSection] = useState("home");
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [copied, setCopied] = useState(false);
   const stageRef = useRef(null);
   const startXRef = useRef(0);
   const activeIndex = archiveProjects.findIndex((project) => project.id === activeId);
@@ -133,13 +138,61 @@ function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [activeIndex]);
 
+  useEffect(() => {
+    const revealNodes = [...document.querySelectorAll("[data-reveal]")];
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -7%" });
+    revealNodes.forEach((node) => revealObserver.observe(node));
+
+    const sectionNodes = [...document.querySelectorAll("main > section[id]")];
+    const sectionObserver = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setCurrentSection(visible.target.id);
+    }, { rootMargin: "-35% 0px -55%", threshold: [0, 0.1, 0.5] });
+    sectionNodes.forEach((node) => sectionObserver.observe(node));
+
+    let frame = 0;
+    const updateProgress = () => {
+      frame = 0;
+      const range = document.documentElement.scrollHeight - window.innerHeight;
+      setScrollProgress(range > 0 ? Math.min(1, window.scrollY / range) : 0);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(updateProgress);
+    };
+    updateProgress();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      revealObserver.disconnect();
+      sectionObserver.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const handlePointerDown = (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     startXRef.current = event.clientX; setIsDragging(true); stageRef.current?.setPointerCapture(event.pointerId);
   };
   const handlePointerMove = (event) => {
-    if (!isDragging) return;
-    setDragX(Math.max(-170, Math.min(170, event.clientX - startXRef.current)));
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (bounds) {
+      stageRef.current.style.setProperty("--pointer-x", `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
+      stageRef.current.style.setProperty("--pointer-y", `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
+    }
+    if (isDragging) setDragX(Math.max(-170, Math.min(170, event.clientX - startXRef.current)));
+  };
+
+  const copyEmail = async () => {
+    await navigator.clipboard?.writeText("keyuntong@126.com");
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   };
   const endDrag = (event) => {
     if (!isDragging) return;
@@ -151,11 +204,17 @@ function App() {
 
   return (
     <div className="site-shell">
+      <div className="page-progress" aria-hidden="true"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
       <header className="site-header">
         <a className="identity" href="#home" aria-label="Yuntong Ke home">
           <span className="identity-mark">YK</span><span><strong>Yuntong Ke</strong><small>Visual Design / AIGC / Narrative</small></span>
         </a>
-        <nav aria-label="Primary navigation"><a href="#home">Index</a><a href="#selected-work">Archive</a><a href="#profile">Profile</a><a href="#contact">Contact</a></nav>
+        <nav aria-label="Primary navigation">
+          <a className={currentSection === "home" ? "is-current" : ""} href="#home">Index</a>
+          <a className={["selected-work", "emotional-weather", "synthetic-archive", "shanxi-heritage"].includes(currentSection) ? "is-current" : ""} href="#selected-work">Archive</a>
+          <a className={currentSection === "profile" ? "is-current" : ""} href="#profile">Profile</a>
+          <a className={currentSection === "contact" ? "is-current" : ""} href="#contact">Contact</a>
+        </nav>
       </header>
 
       <main>
@@ -165,6 +224,7 @@ function App() {
               <source src={asset("assets/video/hero-background.mp4")} type="video/mp4" />
             </video>
           </div>
+          <div className="hero-status"><i />Independent visual designer <span>Beijing / Available worldwide</span></div>
           <div className="hero-heading">
             <p>2024 <span /> 2026</p>
             <h1>An evolving archive<br />of <em>imagined</em> systems.</h1>
@@ -175,6 +235,7 @@ function App() {
               {archiveProjects.map((project, index) => <ProjectPlate key={project.id} project={project} position={positions[index]} dragX={dragX} onSelect={setActiveId} />)}
             </div>
             <aside className="active-project-meta" aria-live="polite">
+              <small>Featured project / {activeProject.number}</small>
               <div><span>Role</span><p>{activeProject.role}</p></div>
               <div><span>Methods</span><p>{activeProject.methods}</p></div>
               <div><span>Outcome</span><p>{activeProject.outcome}</p></div>
@@ -192,7 +253,7 @@ function App() {
           <div className="spring-readout" aria-hidden="true"><span>Spring</span><strong>0.82</strong><i /><i /><i /><i /><i /><i /></div>
         </section>
 
-        <section className="archive-intro" id="selected-work">
+        <section className="archive-intro" id="selected-work" data-reveal>
           <span>Selected work / 01—03</span><h2>Three visual systems built from research, experimentation and narrative.</h2>
           <p>Each project moves from a question or cultural reference to a coherent visual language, combining critical context with emerging image-making tools.</p>
         </section>
@@ -210,11 +271,23 @@ function App() {
               <div><dt>Based in</dt><dd>Beijing, China</dd></div><div><dt>Tools</dt><dd>Photoshop, Illustrator, After Effects, Cinema 4D, Maya, Unity</dd></div>
             </dl>
           </div>
+          <div className="recognition" data-reveal>
+            <span>Selected recognition</span>
+            <ol>
+              <li><strong>National Third Prize</strong><small>17th National College Student Advertising Art Competition</small></li>
+              <li><strong>Provincial Second Prize</strong><small>17th National College Student Advertising Art Competition</small></li>
+              <li><strong>Selected Project</strong><small>Sichuan Student Innovation &amp; Entrepreneurship Programme</small></li>
+              <li><strong>Provincial Third Prize</strong><small>Sichuan Student Digital Media Art &amp; Design Competition</small></li>
+            </ol>
+          </div>
         </section>
 
         <section className="contact-section" id="contact">
           <span>About / Contact</span><h2>Let&apos;s build an<br /><em>imagined world.</em></h2>
-          <div><p>Available for study, commissions and collaboration.</p><a href="mailto:keyuntong@126.com">keyuntong@126.com</a></div>
+          <div className="contact-line">
+            <p>Available for study, commissions and collaboration.</p>
+            <div><a href="mailto:keyuntong@126.com">keyuntong@126.com</a><button type="button" onClick={copyEmail} aria-live="polite">{copied ? "Copied" : "Copy email"}</button></div>
+          </div>
           <footer><span>Yuntong Ke © 2026</span><span>Beijing, China</span></footer>
         </section>
       </main>
