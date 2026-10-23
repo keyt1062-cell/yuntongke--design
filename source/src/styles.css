@@ -126,7 +126,7 @@ button:focus-visible, a:focus-visible { outline: 1px solid var(--cyan); outline-
 .work-gallery-main figcaption { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: end; padding: 60px 32px 28px; background: linear-gradient(180deg,transparent,rgba(2,5,8,.9)); }
 .work-gallery-main figcaption span { color: #b0b7bf; font-size: 10px; letter-spacing: .18em; }
 .work-gallery-main figcaption strong { max-width: 70%; font-family: var(--serif); font-size: clamp(26px,3.5vw,52px); font-weight: 400; text-align: right; }
-.work-gallery-list { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.work-gallery-list { display: grid; grid-template-columns: repeat(var(--item-count),minmax(0,1fr)); gap: 10px; margin-top: 12px; }
 .work-gallery-list button { position: relative; aspect-ratio: 1/.76; padding: 0; overflow: hidden; border: 1px solid transparent; background: #10161d; cursor: pointer; opacity: .58; transition: opacity 220ms ease,border-color 220ms ease,transform 320ms cubic-bezier(.22,1,.36,1); }
 .work-gallery-list button:hover,.work-gallery-list button.is-active { opacity: 1; border-color: rgba(138,223,242,.6); transform: translateY(-5px); }
 .work-gallery-list img { height: 100%; object-fit: cover; }

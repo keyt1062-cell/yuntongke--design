@@ -53,6 +53,11 @@ const heritageWorks = [
   ["Hanging Temple", "optimized/heritage/hanging-temple.jpg"],
   ["Yingxian Pagoda", "optimized/heritage/yingxian-pagoda.jpg"],
   ["Datong Wall", "optimized/heritage/datong-wall.jpg"],
+  ["Mingtang Heritage Park", "optimized/heritage/mingtang.jpg"],
+  ["Chunyang Palace", "optimized/heritage/chunyang-palace.jpg"],
+  ["Daiwang Palace", "optimized/heritage/daiwang-palace.jpg"],
+  ["Drum Tower", "optimized/heritage/drum-tower.jpg"],
+  ["White Pagoda", "optimized/heritage/white-pagoda.jpg"],
 ];
 
 function ProjectPlate({ project, position, dragX, onSelect }) {
@@ -80,7 +85,7 @@ function WorkGallery({ items, label }) {
         <img src={asset(items[active][1])} alt={items[active][0]} loading="lazy" decoding="async" />
         <figcaption><span>{String(active + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}</span><strong>{items[active][0]}</strong></figcaption>
       </figure>
-      <div className="work-gallery-list" role="list" aria-label={label}>
+      <div className="work-gallery-list" role="list" aria-label={label} style={{ "--item-count": Math.min(items.length, 9) }}>
         {items.map(([title, src], index) => (
           <button key={src} className={index === active ? "is-active" : ""} type="button" onClick={() => setActive(index)} aria-pressed={index === active}>
             <img src={asset(src)} alt="" loading="lazy" decoding="async" />
@@ -177,6 +182,7 @@ function App() {
   }, []);
 
   const handlePointerDown = (event) => {
+    if (event.target.closest("a")) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     startXRef.current = event.clientX; setIsDragging(true); stageRef.current?.setPointerCapture(event.pointerId);
   };
