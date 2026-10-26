@@ -16,7 +16,7 @@ const archiveProjects = [
   },
   {
     id: "weather", number: "01", year: "2024", title: "Emotional Weather Bureau",
-    image: "optimized/emotional-weather/serenity-sky.webp", category: "AIGC concept art / speculative design",
+    image: "optimized/emotional-weather/anxiety-storm.webp", category: "AIGC concept art / speculative design",
     role: "Concept, AI art direction, editing and sequencing",
     methods: "Concept mapping, prompt iteration, visual selection and retouching",
     outcome: "An eight-part visual weather system",
@@ -727,6 +727,7 @@ function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [copied, setCopied] = useState(false);
   const stageRef = useRef(null);
+  const contactPortalRef = useRef(null);
   const startXRef = useRef(0);
   const activeIndex = archiveProjects.findIndex((project) => project.id === activeId);
   const activeProject = archiveProjects[activeIndex];
@@ -824,6 +825,23 @@ function App() {
     stageRef.current.style.setProperty("--tilt-x", "0deg");
     stageRef.current.style.setProperty("--tilt-y", "0deg");
   };
+  const moveContactPortal = (event) => {
+    const portal = contactPortalRef.current;
+    if (!portal || window.matchMedia("(pointer: coarse)").matches) return;
+    const bounds = portal.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / Math.max(bounds.width, 1);
+    const y = (event.clientY - bounds.top) / Math.max(bounds.height, 1);
+    portal.style.setProperty("--contact-x", `${x * 100}%`);
+    portal.style.setProperty("--contact-y", `${y * 100}%`);
+    portal.style.setProperty("--contact-ry", `${(x - 0.5) * 7}deg`);
+    portal.style.setProperty("--contact-rx", `${(0.5 - y) * 5}deg`);
+  };
+  const resetContactPortal = () => {
+    const portal = contactPortalRef.current;
+    if (!portal) return;
+    portal.style.setProperty("--contact-ry", "0deg");
+    portal.style.setProperty("--contact-rx", "0deg");
+  };
 
   return (
     <div className="site-shell">
@@ -887,7 +905,8 @@ function App() {
         <ProjectSection project={archiveProjects[2]} eyebrow="Cultural heritage / visual identity" statement="Reframing architectural memory through a shared mythology." items={heritageWorks} process={["Research sites", "Extract motifs", "Develop a visual language", "Standardise the series"]} nextProject={{ anchor: "profile", number: "—", title: "Profile & practice" }} />
 
         <section className="profile-section" id="profile">
-          <div><span>Profile / Practice</span><h2>I connect cultural research, speculative storytelling and digital experience.</h2></div>
+          <img className="profile-background" src={asset("optimized/archive/perception-zone-display.webp")} alt="" loading="lazy" decoding="async" />
+          <div className="profile-heading"><span>Profile / Practice</span><h2>I connect cultural research, speculative storytelling and digital experience.</h2><small>Research-led practice / Beijing, China</small></div>
           <div className="profile-copy">
             <p>I am a Digital Media Art student at Chengdu College of Arts and Sciences. My practice explores AIGC, moving image and digital product design, with particular interest in how emerging tools can support — rather than replace — critical and culturally grounded creative decisions.</p>
             <dl>
@@ -907,10 +926,15 @@ function App() {
         </section>
 
         <section className="contact-section" id="contact">
-          <span>About / Contact</span><h2>Let&apos;s build an<br /><em>imagined world.</em></h2>
-          <div className="contact-line">
-            <p>Available for study, commissions and collaboration.</p>
-            <div><a href="mailto:keyuntong@126.com">keyuntong@126.com</a><button type="button" onClick={copyEmail} aria-live="polite">{copied ? "Copied" : "Copy email"}</button></div>
+          <span>About / Contact</span>
+          <div className="contact-portal" ref={contactPortalRef} onPointerMove={moveContactPortal} onPointerLeave={resetContactPortal}>
+            <div className="contact-portal-topline"><span>Open channel / Worldwide</span><i>Available now</i></div>
+            <h2>Let&apos;s build an<br /><em>imagined world.</em></h2>
+            <div className="contact-line">
+              <p>Available for postgraduate study, commissions and international collaboration.</p>
+              <div><a href="mailto:keyuntong@126.com">keyuntong@126.com</a><button type="button" onClick={copyEmail} aria-live="polite">{copied ? "Copied" : "Copy email"}</button></div>
+            </div>
+            <div className="contact-signal" aria-hidden="true"><span /><span /><span /><i /></div>
           </div>
           <footer><span>Yuntong Ke © 2026</span><span>Beijing, China</span></footer>
         </section>
